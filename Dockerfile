@@ -1,23 +1,29 @@
 # Build Image
-# FIXME: image name should be changed to the correct one
-FROM node:20 AS build
-# WORKDIR /app
+FROM node:20.15.0 AS build
+WORKDIR /app
 COPY . .
-RUN echo "Building the app"
+
+RUN <<EOF bash -ex
+npm install
+npm run build
+rm -rf node_modules/.cache
+EOF
 
 
 # Product Image
-# FIXME: image name should be changed to the correct one
 FROM public.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-nginx:latest-al23
 
 USER root
-RUN <<EOF
-echo "Installing app"
-echo "Done"
+RUN <<EOF bash -ex
+mkdir -p /var/log/nginx
+chown -R nginx:nginx /var/log/nginx
+touch /run/nginx.pid
+chown -R nginx:nginx /run/nginx.pid
 EOF
 
-# COPY --from=build /app/build /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
 
-# EXPOSE 8080
-# USER nginx
-# CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 8080
+USER nginx
+CMD ["nginx", "-g", "daemon off;"]
